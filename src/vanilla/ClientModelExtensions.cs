@@ -278,7 +278,7 @@ namespace AutoRest.TypeScript
             else if (primary.KnownPrimaryType == KnownPrimaryType.Object)
                 return "any";   // TODO: test this
             else if (primary.KnownPrimaryType == KnownPrimaryType.ByteArray || primary.KnownPrimaryType == KnownPrimaryType.Base64Url)
-                return "Buffer";
+                return "Uint8Array";
             else if (primary.KnownPrimaryType == KnownPrimaryType.Stream)
                 return "ReadableStream";
             else if (primary.KnownPrimaryType == KnownPrimaryType.TimeSpan)
