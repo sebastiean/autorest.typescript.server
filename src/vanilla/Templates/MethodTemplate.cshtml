@@ -53,7 +53,7 @@ async @(Model.Name.ToCamelCase())WithHttpOperationResponse(@(Model.MethodParamet
 @(Model.BuildInputMappings())
   @EmptyLine
   // Create HTTP transport objects
-  const httpRequest = new WebResource();
+  const httpRequest = new HttpRequest();
 
   @if (Model.Responses.Any(r => r.Value.Body.IsPrimaryType(KnownPrimaryType.Stream)))
   {
