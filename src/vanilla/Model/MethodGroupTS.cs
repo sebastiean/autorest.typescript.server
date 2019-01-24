@@ -141,22 +141,13 @@ namespace AutoRest.TypeScript.Model
         {
             TSBuilder builder = new TSBuilder();
 
-            builder.LineComment("Operation Specifications");
-            bool addedFirstValue = false;
+            builder.Line("// specifications for new method group start");
             foreach (MethodTS method in MethodTemplateModels)
             {
                 if (!method.IsLongRunningOperation)
                 {
-                    if (addedFirstValue)
-                    {
-                        builder.Line(emptyLine);
-                    }
-                    else
-                    {
-                        builder.ConstObjectVariable("serializer", CodeModelTS.CreateSerializerExpression());
-                        addedFirstValue = true;
-                    }
                     method.GenerateOperationSpecDefinition(builder);
+                    builder.Line(emptyLine);
                 }
             }
 

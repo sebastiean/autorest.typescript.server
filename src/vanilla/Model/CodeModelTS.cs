@@ -616,6 +616,19 @@ namespace AutoRest.TypeScript.Model
             return builder.ToString();
         }
 
+        public string GenerateSpecificationImports(string emptyLine)
+        {
+            TSBuilder builder = new TSBuilder();
+
+            builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+            builder.Line(emptyLine);
+            builder.ImportAllAs("Mappers", "./mappers");
+            builder.Import(new string[] { "Operation" }, "./operation");
+            builder.ImportAllAs("Parameters", "./parameters");
+
+            return builder.ToString();
+        }
+
         public string GenerateServiceClientExports()
         {
             TSBuilder builder = new TSBuilder();
@@ -669,6 +682,36 @@ namespace AutoRest.TypeScript.Model
             return builder.ToString();
         }
 
+        public string GenerateOperationEnum() {
+            TSBuilder builder = new TSBuilder();
+            builder.Comment(AutoRest.Core.Settings.Instance.Header);
+            builder.Line();
+            builder.ExportEnum("Operation", type =>
+            {
+                foreach (MethodTS method in MethodsWithCustomResponseType)
+                {
+                    type.Value(method.SerializedName);
+                }
+            });
+
+            return builder.ToString();
+        }
+
+        public string GenerateSpecificationMapper()
+        {
+            TSBuilder builder = new TSBuilder();
+            builder.Line();
+            builder.Line("const Specifications: { [key: number]: msRest.OperationSpec } = {};");
+
+            foreach (MethodTS method in MethodsWithCustomResponseType)
+            {
+                builder.Line("Specifications[Operation." + method.SerializedName + "] = " + method.GetOperationSpecVariableName() + ";");
+            }
+
+            builder.ExportDefault("Specifications");
+            return builder.ToString();
+        }
+
         public virtual bool HasMappers()
         {
             return OrderedMapperTemplateModels.Any();
@@ -678,6 +721,7 @@ namespace AutoRest.TypeScript.Model
         {
             TSBuilder builder = new TSBuilder();
             builder.Comment(AutoRest.Core.Settings.Instance.Header);
+            builder.Line("// tslint:disable:object-literal-sort-keys");
             builder.Line();
 
             CompositeTypeTS[] orderedMapperTemplateModels = OrderedMapperTemplateModels.ToArray();
@@ -1113,6 +1157,9 @@ namespace AutoRest.TypeScript.Model
 
             builder.Comment(AutoRest.Core.Settings.Instance.Header);
             builder.Line();
+            builder.Line("// tslint:disable:max-line-length");
+            builder.Line("// tslint:disable:interface-name");
+            builder.Line("// tslint:disable:quotemark");
             builder.Line(ConstructRuntimeImportForModelIndex());
             if(ContainsDurationPropertyInModels() || IsAnyModelInheritingFromRequestOptionsBase() || MethodsWithCustomResponseType.Any())
             {

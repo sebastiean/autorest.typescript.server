@@ -1,0 +1,17 @@
+﻿@using AutoRest.TypeScript
+@inherits AutoRest.Core.Template<AutoRest.TypeScript.Model.CodeModelTS>
+/*
+@Header(" * ")
+ */
+// tslint:disable:object-literal-sort-keys
+@EmptyLine
+@(Model.GenerateSpecificationImports(EmptyLine))
+@EmptyLine
+
+const serializer = @(Model.CreateSerializerExpression())
+@foreach (var methodGroup in Model.MethodGroupModels)
+{
+  @(methodGroup.GenerateOperationSpecDefinitions(EmptyLine))
+}
+
+@(Model.GenerateSpecificationMapper())

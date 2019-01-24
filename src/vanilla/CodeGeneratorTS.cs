@@ -51,31 +51,40 @@ namespace AutoRest.TypeScript
                 await WriteServiceClientCodeFile(templateFactory, codeModel);
                 await WriteServiceClientContextCodeFile(templateFactory, codeModel);
 
-                if (ShouldWriteModelsFiles(codeModel))
+                // Generate server models
+                bool shouldWriteModelsFiles = ShouldWriteModelsFiles(codeModel);
+                if (shouldWriteModelsFiles)
                 {
                     await WriteModelsIndexFile(codeModel);
                     if (codeModel.HasMappers())
                     {
+                        // Generate server mappers
                         await WriteMappersIndexFile(codeModel);
                     }
                 }
 
+                // Generate operation enum
+                await WriteOperationEnumFile(codeModel);
+
+                // Generate parameters
                 if (ShouldWriteParameterMappersFile(codeModel))
                 {
                     await WriteParameterMappersFile(codeModel);
                 }
 
+                // Generate specifications
+                await WriteSpecificationFile(codeModel);
+
                 if (ShouldWriteMethodGroupFiles(codeModel))
                 {
-                    await WriteMethodGroupIndexFile(codeModel);
+                    // await WriteMethodGroupIndexFile(codeModel);
 
-                    bool shouldWriteModelsFiles = ShouldWriteModelsFiles(codeModel);
                     foreach (MethodGroupTS methodGroup in codeModel.MethodGroupModels)
                     {
-                        if (shouldWriteModelsFiles)
-                        {
-                            await WriteMethodGroupMappersFile(methodGroup);
-                        }
+                        // if (shouldWriteModelsFiles)
+                        // {
+                        //     await WriteMethodGroupMappersFile(methodGroup);
+                        // }
                         await WriteMethodGroupFile(methodGroup);
                     }
                 }
@@ -172,19 +181,25 @@ namespace AutoRest.TypeScript
 
         protected Task WriteModelsIndexFile(CodeModelTS codeModel)
         {
-            string filePath = GetSourceCodeFilePath(codeModel, "models", "index.ts");
+            string filePath = GetSourceCodeFilePath(codeModel, "artifacts", "models.ts");
             return Write(codeModel.GenerateModelIndex(), filePath);
         }
 
         protected Task WriteMappersIndexFile(CodeModelTS codeModel)
         {
-            string filePath = GetSourceCodeFilePath(codeModel, "models", "mappers.ts");
+            string filePath = GetSourceCodeFilePath(codeModel, "artifacts", "mappers.ts");
             return Write(codeModel.GenerateMapperIndex(), filePath);
+        }
+
+        protected Task WriteOperationEnumFile(CodeModelTS codeModel)
+        {
+            string filePath = GetSourceCodeFilePath(codeModel, "artifacts", "operation.ts");
+            return Write(codeModel.GenerateOperationEnum(), filePath);
         }
 
         protected Task WriteParameterMappersFile(CodeModelTS codeModel)
         {
-            string filePath = GetSourceCodeFilePath(codeModel, "models", "parameters.ts");
+            string filePath = GetSourceCodeFilePath(codeModel, "artifacts", "parameters.ts");
             return Write(new ParameterTemplate { Model = codeModel }, filePath);
         }
 
@@ -205,6 +220,12 @@ namespace AutoRest.TypeScript
             CodeModelTS codeModel = methodGroup.CodeModelTS;
             string filePath = GetSourceCodeFilePath(codeModel, "operations", methodGroup.TypeName.ToCamelCase() + ".ts");
             return Write(new MethodGroupTemplate { Model = methodGroup }, filePath);
+        }
+
+        protected Task WriteSpecificationFile(CodeModelTS codeModel)
+        {
+            string filePath = GetSourceCodeFilePath(codeModel, "artifacts", "specifications.ts");
+            return Write(new SpecificationTemplate { Model = codeModel }, filePath);
         }
 
         protected Task WriteAliasFile(CodeModelTS codeModel)

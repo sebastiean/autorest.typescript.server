@@ -658,34 +658,20 @@ namespace AutoRest.TypeScript.Model
                     type.NamedType(ReturnType.Headers.TSType(inModelsModule: true));
                 }
 
+                if (HasStreamResponseType())
+                {
+                    type.ObjectType(iface =>
+                    {
+                        iface.DocumentationComment("The response body as a node.js Writable stream.");
+                        iface.Property("writableStreamBody", "NodeJS.WritableStream", optional: true);
+                    });
+                }
+
                 type.ObjectType(iface =>
                 {
-                    if (HasStreamResponseType())
-                    {
-                        iface.DocumentationComment(
-                            "BROWSER ONLY",
-                            "",
-                            "The response body as a browser Blob.",
-                            "Always undefined in node.js.");
-
-                        iface.Property("blobBody", "Promise<Blob>", optional: true);
-
-                        iface.DocumentationComment(
-                            "NODEJS ONLY",
-                            "",
-                            "The response body as a node.js Readable stream.",
-                            "Always undefined in the browser.");
-
-                        iface.Property("readableStreamBody", "NodeJS.ReadableStream", optional: true);
-                    }
-                    else if (ReturnType.Body != null && !(ReturnType.Body is CompositeTypeTS || ReturnType.Body is SequenceTypeTS || ReturnType.Body is DictionaryTypeTS))
-                    {
-                        iface.DocumentationComment("The parsed response body.");
-                        iface.Property(primitiveHttpBodyPropertyName, ReturnType.Body.TSType(inModelsModule: true));
-                    }
-
-                    iface.DocumentationComment("The underlying HTTP response.");
-                    iface.Property(rawHttpResponsePropertyName, GenerateHttpOperationResponseType);
+                    string statusCodeValue = string.Join(" | ", Responses.Keys.Select(val => ((int)val).ToString()));
+                    iface.DocumentationComment("The response status code.");
+                    iface.Property("statusCode", "\"" + statusCodeValue + "\"", optional: false);
                 });
             });
         }
@@ -700,9 +686,9 @@ namespace AutoRest.TypeScript.Model
             builder.ConstObjectVariable(GetOperationSpecVariableName(), "msRest.OperationSpec", GenerateOperationSpec);
         }
 
-        protected string GetOperationSpecVariableName()
+        public string GetOperationSpecVariableName()
         {
-            return Name.ToCamelCase() + "OperationSpec";
+            return SerializedName.ToCamelCase() + "OperationSpec";
         }
 
         public static bool IsInOptionsParameter(Parameter parameter)
@@ -779,7 +765,7 @@ namespace AutoRest.TypeScript.Model
             GenerateDocumentationComment(tsClass, "void", requiredParametersWithRequiredOptionsAndRequiredCallback, includeDescription: false, deprecatedMessage: deprecatedMessage);
             tsClass.MethodOverload(methodName, "void", requiredParametersWithRequiredOptionsAndRequiredCallback);
 
-            TSParameter optionalOptionsCallbackUnionParameter = TSParameter.Union(new [] { optionalOptionsParameter, optionalCallbackParameter}, name: "options");
+            TSParameter optionalOptionsCallbackUnionParameter = TSParameter.Union(new[] { optionalOptionsParameter, optionalCallbackParameter }, name: "options");
             IEnumerable<TSParameter> requiredParametersWithOptionalOptionsAndOptionalCallback = requiredParameters.Concat(new[] { optionalOptionsCallbackUnionParameter, optionalCallbackParameter });
             tsClass.Method(methodName, returnType, requiredParametersWithOptionalOptionsAndOptionalCallback, methodBody =>
             {
