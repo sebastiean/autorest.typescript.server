@@ -8,7 +8,7 @@
 @(Model.GenerateSpecificationImports(EmptyLine))
 @EmptyLine
 
-const serializer = @(Model.CreateSerializerExpression())
+const serializer = @(Model.CreateSerializerExpression());
 @foreach (var methodGroup in Model.MethodGroupModels)
 {
   @(methodGroup.GenerateOperationSpecDefinitions(EmptyLine))

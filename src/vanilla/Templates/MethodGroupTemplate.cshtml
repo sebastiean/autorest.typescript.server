@@ -3,21 +3,12 @@
 /*
 @Header(" * ")
  */
+// tslint:disable:max-line-length
+
 @EmptyLine
-@(Model.GenerateMethodGroupImports())
+import * as Models from "../artifacts/models";
+import Context from "../Context";
 @EmptyLine
-/** Class representing a @(Model.TypeName). */
-export class @(Model.TypeName) {
-  private readonly client: @(Model.CodeModelTS.ContextName);
-@EmptyLine
-  /**
-   * Create a @Model.TypeName.
-   * @@param {@Model.CodeModelTS.ContextName} client Reference to the service client.
-   */
-  constructor(client: @(Model.CodeModelTS.ContextName)) {
-    this.client = client;
-  }
+export default interface @(Model.HandlerInterfaceName) {
   @(CodeGeneratorTS.GenerateMethods(Model.MethodTemplateModels, EmptyLine))
 }
-@EmptyLine
-@(Model.GenerateOperationSpecDefinitions(EmptyLine))

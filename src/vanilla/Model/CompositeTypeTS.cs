@@ -422,7 +422,7 @@ namespace AutoRest.TypeScript.Model
                     baseTypeName = $"msRest.{baseTypeName}";
                 }
             }
-            builder.ExportInterface(Name, baseTypeName, tsInterface =>
+            builder.ExportInterface(Name, null, tsInterface =>
             {
                 ISet<string> addedPropertyNames = new HashSet<string>();
                 

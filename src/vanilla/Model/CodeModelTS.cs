@@ -539,7 +539,7 @@ namespace AutoRest.TypeScript.Model
 
         private sealed class ParameterNameComparer : IEqualityComparer<ParameterTS>
         {
-            private ParameterNameComparer() {}
+            private ParameterNameComparer() { }
             public static ParameterNameComparer Instance { get; } = new ParameterNameComparer();
 
             public bool Equals(ParameterTS x, ParameterTS y)
@@ -682,7 +682,8 @@ namespace AutoRest.TypeScript.Model
             return builder.ToString();
         }
 
-        public string GenerateOperationEnum() {
+        public string GenerateOperationEnum()
+        {
             TSBuilder builder = new TSBuilder();
             builder.Comment(AutoRest.Core.Settings.Instance.Header);
             builder.Line();
@@ -693,6 +694,8 @@ namespace AutoRest.TypeScript.Model
                     type.Value(method.SerializedName);
                 }
             });
+
+            builder.ExportDefault("Operation");
 
             return builder.ToString();
         }
@@ -712,6 +715,71 @@ namespace AutoRest.TypeScript.Model
             return builder.ToString();
         }
 
+        public string GenerateHandlerMappers()
+        {
+            TSBuilder builder = new TSBuilder();
+            builder.ImportFrom("Operation", "../artifacts/operation");
+            builder.Line();
+
+            builder.Line("// tslint:disable:one-line");
+            builder.Line();
+
+            builder.ExportInterface("IHandlerPath", null, act =>
+            {
+                act.Property("handler", "string");
+                act.Property("method", "string");
+                act.Property("arguments", "string[]");
+            });
+            builder.Line();
+
+            builder.ConstObjectVariable("operationHandlerMapping", "{[key: number]: IHandlerPath}", "{}");
+            builder.Line();
+
+            foreach (MethodTS method in MethodsWithCustomResponseType)
+            {
+                builder.Text("operationHandlerMapping[Operation." + method.SerializedName + "] = ");
+                builder.Object(obj =>
+                {
+                    obj.QuotedStringArrayProperty("arguments", method.GetHandlerParameters().SkipLast(1).Select(val => val.Name));
+                    obj.TextProperty("handler", '"' + ((MethodGroupTS)(method.MethodGroup)).HandlerName + '"');
+                    obj.TextProperty("method", '"' + method.GetHandlerInterfaceMethodName() + '"');
+                });
+
+                builder.Text(";");
+                builder.Line();
+            }
+
+            builder.Text("function ");
+            builder.Method("getHandlerByOperation", "IHandlerPath | undefined", "operation: Operation", block => {
+                block.Return("operationHandlerMapping[operation]");
+            });
+
+            builder.ExportDefault("getHandlerByOperation");
+            return builder.ToString();
+        }
+
+        public string GenerateIHandler()
+        {
+            TSBuilder builder = new TSBuilder();
+            builder.Line("// tslint:disable:ordered-imports");
+
+            foreach (MethodGroupTS method in MethodGroupModels)
+            {
+                builder.ImportFrom(method.HandlerInterfaceName, "./" + method.HandlerInterfaceName);
+            }
+            builder.Line();
+
+            builder.ExportInterface("IHandlers", null, inter => {
+                foreach (MethodGroupTS method in MethodGroupModels)
+                {
+                    inter.Property(method.HandlerName, method.HandlerInterfaceName);
+                }
+            });
+            builder.ExportDefault("IHandlers");
+
+            return builder.ToString();
+        }
+
         public virtual bool HasMappers()
         {
             return OrderedMapperTemplateModels.Any();
@@ -727,8 +795,6 @@ namespace AutoRest.TypeScript.Model
             CompositeTypeTS[] orderedMapperTemplateModels = OrderedMapperTemplateModels.ToArray();
 
             ImportMsRestForMappers(builder, orderedMapperTemplateModels);
-
-            builder.Line();
 
             ExportOrderedMapperModels(builder, orderedMapperTemplateModels);
 
@@ -1160,17 +1226,17 @@ namespace AutoRest.TypeScript.Model
             builder.Line("// tslint:disable:max-line-length");
             builder.Line("// tslint:disable:interface-name");
             builder.Line("// tslint:disable:quotemark");
-            builder.Line(ConstructRuntimeImportForModelIndex());
-            if(ContainsDurationPropertyInModels() || IsAnyModelInheritingFromRequestOptionsBase() || MethodsWithCustomResponseType.Any())
-            {
-                builder.ImportAllAs("msRest", "@azure/ms-rest-js");
-            }
-            foreach(CompositeTypeTS model in OrderedModelTemplateModels)
+            // builder.Line(ConstructRuntimeImportForModelIndex());
+            // if (ContainsDurationPropertyInModels() || IsAnyModelInheritingFromRequestOptionsBase() || MethodsWithCustomResponseType.Any())
+            // {
+            //     builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+            // }
+            foreach (CompositeTypeTS model in OrderedModelTemplateModels)
             {
                 builder.Line();
                 builder.Line(model.Generate());
             }
-            foreach(EnumTypeTS model in EnumTemplateModels)
+            foreach (EnumTypeTS model in EnumTemplateModels)
             {
                 builder.Line();
                 builder.Line(model.Generate(Settings.EnumTypes));

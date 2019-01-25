@@ -691,6 +691,16 @@ namespace AutoRest.TypeScript.Model
             return SerializedName.ToCamelCase() + "OperationSpec";
         }
 
+        public string GetHandlerInterfaceMethodName()
+        {
+            var splited = SerializedName.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (splited.Length > 1)
+            {
+                splited = splited.Skip(1).ToArray();
+            }
+            return String.Join("", splited).ToCamelCase();
+        }
+
         public static bool IsInOptionsParameter(Parameter parameter)
         {
             return parameter != null && !parameter.IsClientProperty && !string.IsNullOrWhiteSpace(parameter.Name) && !parameter.IsConstant && !parameter.IsRequired;
@@ -727,7 +737,7 @@ namespace AutoRest.TypeScript.Model
             string optionsParameterType;
             if (OptionsParameterModelType.Name.EqualsIgnoreCase("RequestOptionsBase"))
             {
-                optionsParameterType = "msRest.RequestOptionsBase";
+                return null;
             }
             else
             {
@@ -736,54 +746,38 @@ namespace AutoRest.TypeScript.Model
             return new TSParameter("options", optionsParameterType, "The optional parameters", required);
         }
 
+        protected TSParameter GetContextParameter()
+        {
+            return new TSParameter("context", "Context", "", true);
+        }
+
         protected TSParameter GetCallbackParameter(bool required)
         {
             return new TSParameter("callback", $"msRest.ServiceCallback<{ReturnTypeTSString}>", "The callback", required);
         }
 
+        public virtual IEnumerable<TSParameter> GetHandlerParameters()
+        {
+            IEnumerable<TSParameter> requiredParameters = GetRequiredParameters();
+            TSParameter requiredOptionsParameter = GetOptionsParameter(true);
+            IEnumerable<TSParameter> requiredParametersWithOptionalOptions = requiredParameters.Concat(new[] { GetContextParameter() });
+            if (requiredOptionsParameter != null)
+            {
+                requiredParametersWithOptionalOptions = requiredParameters.Concat(new[] { requiredOptionsParameter, GetContextParameter() });
+            }
+            requiredParametersWithOptionalOptions = requiredParametersWithOptionalOptions.Select(x => x.Name.Equals(primitiveHttpBodyPropertyName) ? new TSParameter(x.Name, "NodeJS.ReadableStream", x.Description, true) : x);
+
+            return requiredParametersWithOptionalOptions;
+        }
+
         public virtual void Generate(TSClass tsClass)
         {
-            string methodName = Name.ToCamelCase();
+            string methodName = GetHandlerInterfaceMethodName().ToCamelCase();
             string responseName = HttpResponseReferenceName;
-            IEnumerable<TSParameter> requiredParameters = GetRequiredParameters();
-            TSParameter optionalOptionsParameter = GetOptionsParameter(false);
-            TSParameter requiredOptionsParameter = GetOptionsParameter(true);
-            TSParameter optionalCallbackParameter = GetCallbackParameter(false);
-            TSParameter requiredCallbackParameter = GetCallbackParameter(true);
             string returnType = $"Promise<{responseName}>";
-            string deprecatedMessage = DeprecationMessage;
 
-            IEnumerable<TSParameter> requiredParametersWithOptionalOptions = requiredParameters.Concat(new[] { optionalOptionsParameter });
-            GenerateDocumentationComment(tsClass, returnType, requiredParametersWithOptionalOptions, deprecatedMessage: deprecatedMessage);
+            IEnumerable<TSParameter> requiredParametersWithOptionalOptions = GetHandlerParameters();
             tsClass.MethodOverload(methodName, returnType, requiredParametersWithOptionalOptions);
-
-            IEnumerable<TSParameter> requiredParametersWithRequiredCallback = requiredParameters.Concat(new[] { requiredCallbackParameter });
-            GenerateDocumentationComment(tsClass, "void", requiredParametersWithRequiredCallback, includeDescription: false, deprecatedMessage: deprecatedMessage);
-            tsClass.MethodOverload(methodName, "void", requiredParametersWithRequiredCallback);
-
-            IEnumerable<TSParameter> requiredParametersWithRequiredOptionsAndRequiredCallback = requiredParameters.Concat(new[] { requiredOptionsParameter, requiredCallbackParameter });
-            GenerateDocumentationComment(tsClass, "void", requiredParametersWithRequiredOptionsAndRequiredCallback, includeDescription: false, deprecatedMessage: deprecatedMessage);
-            tsClass.MethodOverload(methodName, "void", requiredParametersWithRequiredOptionsAndRequiredCallback);
-
-            TSParameter optionalOptionsCallbackUnionParameter = TSParameter.Union(new[] { optionalOptionsParameter, optionalCallbackParameter }, name: "options");
-            IEnumerable<TSParameter> requiredParametersWithOptionalOptionsAndOptionalCallback = requiredParameters.Concat(new[] { optionalOptionsCallbackUnionParameter, optionalCallbackParameter });
-            tsClass.Method(methodName, returnType, requiredParametersWithOptionalOptionsAndOptionalCallback, methodBody =>
-            {
-                methodBody.Return(returnValue =>
-                {
-                    returnValue.FunctionCall($"{ClientReference}.sendOperationRequest", argumentList =>
-                    {
-                        argumentList.Object((TSObject tsObject) => GenerateOperationArguments(tsObject));
-                        argumentList.Text(GetOperationSpecVariableName());
-                        argumentList.Text("callback");
-                    });
-
-                    if (HasCustomHttpResponseType)
-                    {
-                        returnValue.Text($" as {returnType}");
-                    }
-                });
-            });
         }
 
         public virtual bool IsWrappable()

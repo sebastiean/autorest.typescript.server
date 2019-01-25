@@ -48,8 +48,8 @@ namespace AutoRest.TypeScript
         {
             if (!IsMultiapiLatest(codeModel))
             {
-                await WriteServiceClientCodeFile(templateFactory, codeModel);
-                await WriteServiceClientContextCodeFile(templateFactory, codeModel);
+                // await WriteServiceClientCodeFile(templateFactory, codeModel);
+                // await WriteServiceClientContextCodeFile(templateFactory, codeModel);
 
                 // Generate server models
                 bool shouldWriteModelsFiles = ShouldWriteModelsFiles(codeModel);
@@ -87,6 +87,10 @@ namespace AutoRest.TypeScript
                         // }
                         await WriteMethodGroupFile(methodGroup);
                     }
+
+                    // Write handler mappers
+                    await WriteHandlerMappersFile(codeModel);
+                    await WriteIHandlersFile(codeModel);
                 }
             }
             else
@@ -218,8 +222,21 @@ namespace AutoRest.TypeScript
         protected Task WriteMethodGroupFile(MethodGroupTS methodGroup)
         {
             CodeModelTS codeModel = methodGroup.CodeModelTS;
-            string filePath = GetSourceCodeFilePath(codeModel, "operations", methodGroup.TypeName.ToCamelCase() + ".ts");
+            string typeName = methodGroup.TypeName.ToCamelCase();
+            string filePath = GetSourceCodeFilePath(codeModel, "handlers", methodGroup.HandlerInterfaceName + ".ts");
             return Write(new MethodGroupTemplate { Model = methodGroup }, filePath);
+        }
+
+        protected Task WriteHandlerMappersFile(CodeModelTS codeModel)
+        {
+            string filePath = GetSourceCodeFilePath(codeModel, "handlers", "handlerMappers.ts");
+            return Write(codeModel.GenerateHandlerMappers(), filePath);
+        }
+
+        protected Task WriteIHandlersFile(CodeModelTS codeModel)
+        {
+            string filePath = GetSourceCodeFilePath(codeModel, "handlers", "IHandlers.ts");
+            return Write(codeModel.GenerateIHandler(), filePath);
         }
 
         protected Task WriteSpecificationFile(CodeModelTS codeModel)
@@ -282,7 +299,6 @@ namespace AutoRest.TypeScript
             TSClass tsClass = new TSClass(builder);
             foreach (MethodTS method in methods)
             {
-                tsClass.Line(emptyLine);
                 method.Generate(tsClass);
             }
             return builder.ToString();

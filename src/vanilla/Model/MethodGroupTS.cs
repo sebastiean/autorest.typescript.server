@@ -28,6 +28,9 @@ namespace AutoRest.TypeScript.Model
 
         public string MappersModuleName => TypeName.ToCamelCase() + "Mappers";
 
+        public string HandlerInterfaceName => "I" + TypeName.ToCamelCase()[0].ToString().ToUpper()[0] + TypeName.ToCamelCase().Substring(1) + "Handler";
+        public string HandlerName => TypeName.ToCamelCase() + "Handler";
+
         public ISet<string> OperationModelNames
         {
             get
