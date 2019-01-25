@@ -671,7 +671,7 @@ namespace AutoRest.TypeScript.Model
                 {
                     string statusCodeValue = string.Join(" | ", Responses.Keys.Select(val => ((int)val).ToString()));
                     iface.DocumentationComment("The response status code.");
-                    iface.Property("statusCode", "\"" + statusCodeValue + "\"", optional: false);
+                    iface.Property("statusCode", statusCodeValue, optional: false);
                 });
             });
         }
