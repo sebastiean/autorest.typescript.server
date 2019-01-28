@@ -371,7 +371,7 @@ namespace AutoRest.TypeScript
         {
             "customHeaders",
             "abortSignal",
-            "timeout",
+            // "timeout",
             "onUploadProgress",
             "onDownloadProgress"
         };
