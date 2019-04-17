@@ -274,14 +274,18 @@ namespace AutoRest.TypeScript
             }
             else
             {
+                var isXML = method.CodeModel.ShouldGenerateXmlSerialization == true;
                 ConstructMapper(
                     value: value,
                     type: responseBodyModelType,
-                    serializedName: "parsedResponse",
+                    serializedName: isXML ? response.Body.XmlName : "parsedResponse",
                     parameter: null,
                     isPageable: false,
                     expandComposite: false,
-                    isXML: method.CodeModel.ShouldGenerateXmlSerialization == true);
+                    isXML: isXML,
+                    isCaseSensitive: true,
+                    xmlName: isXML ? response.Body.XmlName : null
+                    );
             }
         }
 
