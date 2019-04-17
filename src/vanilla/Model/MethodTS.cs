@@ -662,8 +662,8 @@ namespace AutoRest.TypeScript.Model
                 {
                     type.ObjectType(iface =>
                     {
-                        iface.DocumentationComment("The response body as a node.js Writable stream.");
-                        iface.Property("writableStreamBody", "NodeJS.WritableStream", optional: true);
+                        iface.DocumentationComment("The response body as a node.js Readable stream.");
+                        iface.Property("body", "NodeJS.ReadableStream", optional: true);
                     });
                 }
 
