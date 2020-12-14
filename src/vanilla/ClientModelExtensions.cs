@@ -38,12 +38,12 @@ namespace AutoRest.TypeScript
                 switch (known.KnownPrimaryType)
                 {
                     case KnownPrimaryType.Date:
-                        return $"msRest.serializeObject({reference}).replace(/[Tt].*[Zz]/, '')";
+                        return $"coreHttp.serializeObject({reference}).replace(/[Tt].*[Zz]/, '')";
                     case KnownPrimaryType.DateTimeRfc1123:
                         return $"{reference} instanceof Date ? {reference}.toUTCString() : {reference}";
                     case KnownPrimaryType.DateTime:
                     case KnownPrimaryType.ByteArray:
-                        return $"msRest.serializeObject({reference})";
+                        return $"coreHttp.serializeObject({reference})";
                     case KnownPrimaryType.TimeSpan:
                         return $"{reference}";
                     case KnownPrimaryType.Base64Url:
@@ -83,11 +83,11 @@ namespace AutoRest.TypeScript
             else if (primary.KnownPrimaryType == KnownPrimaryType.ByteArray || primary.KnownPrimaryType == KnownPrimaryType.Base64Url)
                 return "Uint8Array";
             else if (primary.KnownPrimaryType == KnownPrimaryType.Stream)
-                return "msRest.HttpRequestBody";
+                return "coreHttp.HttpRequestBody";
             else if (primary.KnownPrimaryType == KnownPrimaryType.TimeSpan)
                 return "string";
             else if (primary.KnownPrimaryType == KnownPrimaryType.Credentials)
-                return "msRest.ServiceClientCredentials"; //TODO: test this, add include for it
+                return "coreHttp.TokenCredential | coreHttp.ServiceClientCredentials";
             else {
                 throw new NotImplementedException($"Type '{primary}' not implemented");
             }
@@ -146,10 +146,10 @@ namespace AutoRest.TypeScript
             }
             else if (composite != null)
             {
-                // ServiceClientCredentials starts with the "msRest." prefix, so strip msRest./msRestAzure. as we import those
+                // ServiceClientCredentials starts with the "coreHttp." prefix, so strip coreHttp./coreArm. as we import those
                 // types with no module prefix needed
                 var compositeName = composite.UnionTypeName;
-                if (compositeName.StartsWith("msRest.") || compositeName.StartsWith("msRestAzure."))
+                if (compositeName.StartsWith("coreHttp.") || compositeName.StartsWith("coreArm."))
                     tsType = compositeName.Substring(compositeName.IndexOf('.') + 1);
                 else if (inModelsModule || compositeName.Contains('.'))
                     tsType = compositeName;
@@ -206,7 +206,7 @@ namespace AutoRest.TypeScript
         public static string CreateSerializerExpression(this CodeModelTS codeModel)
         {
             TSBuilder builder = new TSBuilder();
-            builder.FunctionCall("new msRest.Serializer", arguments =>
+            builder.FunctionCall("new coreHttp.Serializer", arguments =>
             {
                 bool hasMappers = codeModel.HasMappers();
                 if (hasMappers)
@@ -557,11 +557,7 @@ namespace AutoRest.TypeScript
                         }
                         else
                         {
-                            CompositeType baseType = composite;
-                            while (baseType.BaseModelType != null)
-                            {
-                                baseType = baseType.BaseModelType;
-                            }
+                            CompositeType baseType = GetUberParent(composite);
                             if (baseType.IsPolymorphic)
                             {
                                 typeObject.TextProperty("polymorphicDiscriminator", baseType.Name + ".type.polymorphicDiscriminator");
@@ -641,6 +637,23 @@ namespace AutoRest.TypeScript
             {
                 throw new NotImplementedException($"{type} is not a supported Type.");
             }
+        }
+
+        /// <summary>
+        /// Finds the UberParent for a given Composite type.
+        /// An uber parent is the closest parent that defines the polymorphicDiscriminator
+        /// </summary>
+        /// <param name="composite">The composite type to find the uberParent for</param>
+        /// <returns>The uberParent or itself if it has no uberParent</returns>
+        private static CompositeType GetUberParent(CompositeTypeTS composite)
+        {
+            CompositeType uberParent = composite;
+            while (uberParent.BaseModelType != null && string.IsNullOrWhiteSpace(uberParent.PolymorphicDiscriminator))
+            {
+                uberParent = uberParent.BaseModelType;
+            }
+
+            return uberParent;
         }
 
         private static void AddTypeProperty(TSObject mapper, string mapperTypeName, Action<TSObject> additionalTypeObjectPropertiesAction = null)

@@ -9,8 +9,8 @@ npm install -g autorest
 # Compatibility
 This AutoRest extension generates TypeScript code that is compatible with:
 ```
-"@azure/ms-rest-azure-js": "^1.2.0",
-"@azure/ms-rest-js": "^1.2.0"
+"@azure/core-arm": "^1.0.0-preview.1",
+"@azure/core-http": "^1.0.0-preview.1"
 ```
 
 # Usage
@@ -93,7 +93,7 @@ export interface MyOperationHeaders {
 ```
 
 ## --source-code-folder-path
-The folder relative to the output-folder path that the TypeScript source code files will be generated in. If no value is provided for this flag, then it will default to `lib`. If an empty string is provided for this flag, then the TypeScript source code files will be generated in the output-folder.
+The folder relative to the output-folder path that the TypeScript source code files will be generated in. If no value is provided for this flag, then it will default to `src`. If an empty string is provided for this flag, then the TypeScript source code files will be generated in the output-folder.
 
 ### --azure-arm
 For generating a client for an Azure service, provide `--typescript.azure-arm=true`:
@@ -147,6 +147,17 @@ autorest --typescript \
   --input-file=<path-to-swagger-spec> \
   --package-name=<your-package-name> \
   --skip-subtypes=[BaseResource,Resource,SubResource]
+```
+
+## --custom-service-client-options
+A list of `ServiceClientOptions` settings to override in the generated client. By default keys are wrapped in quotes but values are not. Use single quotation marks (`'`) if you want your values to be injected as a string. See [ServiceClientOptions in @azure/core-http package](https://github.com/Azure/azure-sdk-for-js/blob/master/sdk/core/core-http/lib/serviceClient.ts) for available options.
+```bash
+autorest --typescript \
+  --output-folder=<path-to-the-output-folder(usually upto lib folder of your project)> \
+  --license-header=MICROSOFT_MIT_NO_VERSION \
+  --input-file=<path-to-swagger-spec> \
+  --package-name=<your-package-name> \
+  --custom-service-client-options=[noRetryPolicy=true,userAgentHeaderName=\'My-Header-Key\']
 ```
 
 ### Further Documentation on the Command Line

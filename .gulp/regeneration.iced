@@ -57,11 +57,20 @@ regenExpected = (opts,done) ->
     if (opts.generateLicenseTxt != undefined)
       args.push("--generate-license-txt=#{opts.generateLicenseTxt}")
 
+    if (opts.test)
+      args.push("--test=#{opts.test}")
+
+    if (opts.testDependencies)
+      args.push("--test-dependencies=#{opts.testDependencies}")
+
     if (opts.clientSideValidation == false)
       args.push("--client-side-validation=false")
 
     if (opts.skipSubtypes != undefined && opts.skipSubtypes.length > 0)
       args.push("--skip-subtypes=#{opts.skipSubtypes}")
+
+    if (opts.customServiceClientOptions != undefined && opts.customServiceClientOptions.length > 0)
+      args.push("--custom-service-client-options=#{opts.customServiceClientOptions}")
 
     if (!!opts.nsPrefix)
       if (optsMappingsValue instanceof Array && optsMappingsValue[1] != undefined)
@@ -307,7 +316,7 @@ task 'regenerate-ts-metadata', '', [], (done) ->
     'flatteningThreshold': '1',
     'generateMetadata': true,
     'generateLicenseTxt': false,
-    'sourceCodeFolderPath': 'lib'
+    'sourceCodeFolderPath': 'src'
   },done
   return null
 
@@ -322,7 +331,7 @@ task 'regenerate-tsazure-metadata', '', [], (done) ->
     'flatteningThreshold': '1',
     'azureArm': true,
     'generateMetadata': true,
-    'sourceCodeFolderPath': 'lib'
+    'sourceCodeFolderPath': 'src'
   },done
   return null
 
@@ -346,11 +355,50 @@ task 'regenerate-ts-skip-subtypes', '', [], (done) ->
     'outputDir': 'generated',
     'language': 'typescript',
     'generateMetadata': true,
-    'sourceCodeFolderPath': 'lib',
+    'sourceCodeFolderPath': 'src',
     'skipSubtypes': '[Fish]'
   },done
   return null
 
+task 'regenerate-ts-custom-service-client-options', '', [], (done) ->
+  regenExpected {
+    'outputBaseDir': 'test/custom-service-client-options',
+    'inputBaseDir': swaggerDir,
+    'mappings': xmlMappings,
+    'outputDir': 'generated',
+    'language': 'typescript',
+    'generateMetadata': true,
+    'sourceCodeFolderPath': 'src',
+    'customServiceClientOptions': '[noRetryPolicy=true,userAgentHeaderName=\'My-Header-Key\']'
+  },done
+  return null
+
+task 'regenerate-ts-tests-mocha', '', [], (done) ->
+  regenExpected {
+    'outputBaseDir': 'test/unit-tests-mocha',
+    'inputBaseDir': swaggerDir,
+    'mappings': enumTypesMappings,
+    'outputDir': 'generated',
+    'language': 'typescript',
+    'generateMetadata': true,
+    'sourceCodeFolderPath': 'src',
+    'test': true
+  },done
+  return null
+
+task 'regenerate-ts-tests-custom', '', [], (done) ->
+  regenExpected {
+    'outputBaseDir': 'test/unit-tests-custom',
+    'inputBaseDir': swaggerDir,
+    'mappings': enumTypesMappings,
+    'outputDir': 'generated',
+    'language': 'typescript',
+    'generateMetadata': true,
+    'sourceCodeFolderPath': 'src',
+    'test': 'echo \"skipped\"',
+    'testDependencies': 'nock@1.0.0, jest@2.0.0; @azure/ms-rest-js@3.0.0'
+  },done
+  return null
 
 tsTasks = [
   'regenerate-tscomposite',
@@ -361,7 +409,10 @@ tsTasks = [
   'regenerate-ts-date-time-as-string',
   'regenerate-ts-optional-response-headers',
   'regenerate-ts-rename-parameter',
-  'regenerate-ts-skip-subtypes'
+  'regenerate-ts-skip-subtypes',
+  'regenerate-ts-custom-service-client-options',
+  'regenerate-ts-tests-mocha',
+  'regenerate-ts-tests-custom'
 ]
 
 task 'regenerate-ts', '', tsTasks, (done) ->

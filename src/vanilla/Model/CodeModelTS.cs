@@ -22,7 +22,8 @@ namespace AutoRest.TypeScript.Model
         private const string ServiceClientOptions = "ServiceClientOptions";
 
         private const string defaultGitHubRepositoryName = "azure-sdk-for-js";
-        private const string defaultGitHubUrl = "https://github.com/azure/" + defaultGitHubRepositoryName;
+
+        private const string defaultGitHubUrl = "https://github.com/Azure/" + defaultGitHubRepositoryName;
 
         private static readonly string[] propertiesToIgnore = { "generateClientRequestId" };
 
@@ -35,6 +36,9 @@ namespace AutoRest.TypeScript.Model
         public GeneratorSettingsTS Settings { get; set; }
 
         private string _optionalParameterTypeForClientConstructor;
+
+        [JsonIgnore]
+        public new string Name => base.Name.ToPascalCase();
 
         [JsonIgnore]
         public string ContextName => Name + "Context";
@@ -98,25 +102,6 @@ namespace AutoRest.TypeScript.Model
                 }
 
                 return _requestContentType;
-            }
-        }
-
-        [JsonIgnore]
-        public string SchemeHostAndPort
-        {
-            get
-            {
-                string result = null;
-                string baseUrl = BaseUrl;
-                if (!string.IsNullOrEmpty(baseUrl))
-                {
-                    const string colonSlashSlash = "://";
-                    int colonSlashSlashIndex = baseUrl.IndexOf(colonSlashSlash);
-                    int hostStartIndex = colonSlashSlashIndex == -1 ? 0 : colonSlashSlashIndex + colonSlashSlash.Length;
-                    int pathStartIndex = baseUrl.IndexOf('/', hostStartIndex);
-                    result = (pathStartIndex == -1 ? baseUrl : baseUrl.Substring(0, pathStartIndex));
-                }
-                return result;
             }
         }
 
@@ -226,13 +211,10 @@ namespace AutoRest.TypeScript.Model
                 string result = defaultGitHubUrl;
                 if (!string.IsNullOrEmpty(Settings.OutputFolder))
                 {
-                    string outputFolder = Settings.OutputFolder.Replace('\\', '/');
-                    string searchStringSuffix = $"/packages/";
-                    string outputFolderSearchString = "/" + defaultGitHubRepositoryName + searchStringSuffix;
-                    int searchStringIndex = outputFolder.IndexOf(outputFolderSearchString, StringComparison.OrdinalIgnoreCase);
-                    if (0 <= searchStringIndex)
+                    string relativeOutputPath = Settings.RelativeOutputPath;
+                    if (!String.IsNullOrEmpty(relativeOutputPath))
                     {
-                        result += "/tree/master" + searchStringSuffix + outputFolder.Substring(searchStringIndex + outputFolderSearchString.Length);
+                        result += "/tree/master/sdk" + relativeOutputPath;
                     }
                 }
                 return result;
@@ -251,6 +233,28 @@ namespace AutoRest.TypeScript.Model
                 return clientIndex > 0 ? Name.Substring(0, clientIndex) : Name;
             }
         }
+
+        public bool AutoPublish
+        {
+            get
+            {
+                if (Settings.AutoPublish.HasValue)
+                {
+                    return Settings.AutoPublish.Value;
+                }
+                else
+                {
+                    bool isGeneratedForAzureSdkForJs = Settings.OutputFolder.Contains(defaultGitHubRepositoryName);
+                    return isGeneratedForAzureSdkForJs;
+                }
+            }
+        }
+
+        [JsonIgnore]
+        public bool HasTests => Settings.Test != null;
+
+        [JsonIgnore]
+        internal string TestCommand => Settings.Test.ToLowerInvariant() == "true" ? "mocha" : Settings.Test;
 
         public bool ContainsDurationProperty()
         {
@@ -314,9 +318,9 @@ namespace AutoRest.TypeScript.Model
                 {
                     string discriminatorField = polymorphicTypes.ElementAt(i).SerializedName;
                     var polymorphicType = polymorphicTypes.ElementAt(i) as CompositeType;
-                    if (polymorphicType.BaseModelType != null)
+                    if (polymorphicType.BaseModelType != null && string.IsNullOrWhiteSpace(polymorphicType.PolymorphicDiscriminator))
                     {
-                        while (polymorphicType.BaseModelType != null)
+                        while (polymorphicType.BaseModelType != null && string.IsNullOrWhiteSpace(polymorphicType.PolymorphicDiscriminator))
                         {
                             polymorphicType = polymorphicType.BaseModelType;
                         }
@@ -351,12 +355,20 @@ namespace AutoRest.TypeScript.Model
             }
         }
 
+        protected IEnumerable<Property> SortedProperties
+        {
+            get
+            {
+                return Properties.OrderBy(prop => prop.ModelType.IsPrimaryType(KnownPrimaryType.Credentials) ? 0 : 1);
+            }
+        }
+
         public string RequiredConstructorParameters
         {
             get
             {
                 var requireParams = new List<string>();
-                this.Properties.Where(p => p.IsRequired && !p.IsConstant && string.IsNullOrEmpty(p.DefaultValue))
+                SortedProperties.Where(p => p.IsRequired && !p.IsConstant && string.IsNullOrEmpty(p.DefaultValue))
                     .ForEach(p => requireParams.Add(p.Name.ToCamelCase()));
 
                 if (requireParams == null || requireParams.Count == 0)
@@ -378,7 +390,7 @@ namespace AutoRest.TypeScript.Model
                 StringBuilder requiredParams = new StringBuilder();
 
                 bool first = true;
-                foreach (var p in this.Properties)
+                foreach (var p in SortedProperties)
                 {
                     if (!p.IsRequired || p.IsConstant || (p.IsRequired && !string.IsNullOrEmpty(p.DefaultValue)))
                         continue;
@@ -397,6 +409,115 @@ namespace AutoRest.TypeScript.Model
             }
         }
 
+        public virtual string GenerateConstructor(string superArgumentList, Action<TSBlock> guardChecks = null, Action<TSBlock> implementation = null)
+        {
+            TSBuilder builder = new TSBuilder();
+            var clientOptionType = OptionalParameterTypeForClientConstructor;
+            if (OptionalParameterTypeForClientConstructor == GetServiceClientOptionsName())
+            {
+                clientOptionType =
+                    OptionalParameterTypeForClientConstructor.StartsWith("Azure")
+                    ? "coreArm." + GetServiceClientOptionsName()
+                    : "coreHttp." + GetServiceClientOptionsName();
+            }
+
+            string parameterList = (!string.IsNullOrEmpty(RequiredConstructorParametersTS) ? RequiredConstructorParametersTS + ", " : "") + "options?: " + clientOptionType;
+
+            builder.Constructor(parameterList, superArgumentList, guardChecks, implementation);
+
+            return builder.ToString();
+        }
+
+        public virtual string GenerateClientConstructor()
+        {
+            string superParameterList = (!string.IsNullOrEmpty(RequiredConstructorParameters) ? RequiredConstructorParameters + ", " : "") + "options";
+            return this.GenerateConstructor(superParameterList, null, GenerateOperationGroupInitialization);
+        }
+
+        public virtual string GenerateContextConstructor(string emptyLine)
+        {
+            Action<TSBlock> guardCheck = block =>
+            {
+                foreach (var param in RequiredParameters)
+                {
+                    block.If($"{param.Name} == undefined", then =>
+                    {
+                        then.Throw($"new Error(\"\'{param.Name}\' cannot be null.\")");
+                    });
+                }
+
+                if (RequiredParameters.Any())
+                {
+                    block.Line(emptyLine);
+                }
+
+                block.If("!options", then =>
+                {
+                    then.Assignment("options", "{}");
+                });
+
+                block.Line(emptyLine);
+                block.If("!options.userAgent", then =>
+                {
+                    then.ConstObjectVariable("defaultUserAgent", "coreHttp.getDefaultUserAgentValue()");
+                    then.Assignment("options.userAgent", "`${packageName}/${packageVersion} ${defaultUserAgent}`");
+                });
+
+                block.Line(GenerateCustomServiceClientOptions(emptyLine));
+                block.Line(emptyLine);
+            };
+
+            string credentialsParameter = RequiredParameters.Any(p => p.ModelType.IsPrimaryType(KnownPrimaryType.Credentials)) ? "credentials" : "undefined";
+            string superParameters = credentialsParameter + ", options";
+
+            Action<TSBlock> implementation = block =>
+            {
+                block.Line(emptyLine);
+                foreach (var property in Properties.Where(p => p.DefaultValue != null))
+                {
+                    block.ThisAssignment(property.Name, property.DefaultValue);
+                }
+
+                block.Line(GenerateBaseUri());
+
+                if (!String.IsNullOrEmpty(RequestContentType))
+                {
+                    block.ThisAssignment("requestContentType", $"\"{RequestContentType}\"");
+                }
+
+                foreach (var param in RequiredParameters)
+                {
+                    block.ThisAssignment(param.Name, param.Name);
+                }
+
+                if (OptionalParameters.Where(p => p.Name != "generatedClientRequestId").Any())
+                {
+                    foreach (var property in OptionalParameters.Where(p => p.Name != "generatedClientRequestId"))
+                    {
+                        block.If($"options.{property.Name} !== null && options.{property.Name} !== undefined", then =>
+                        {
+                            block.ThisAssignment(property.Name, $"options.{property.Name}");
+                        });
+                    }
+                }
+            };
+
+            return this.GenerateConstructor(superParameters, guardCheck, implementation);
+        }
+
+        protected virtual string GetServiceClientOptionsName()
+        {
+            return ServiceClientOptions;
+        }
+
+        private void GenerateOperationGroupInitialization(TSBlock block)
+        {
+            foreach (var methodGroup in MethodGroupModels)
+            {
+                block.ThisAssignment(methodGroup.NameForProperty, $"new operations.{methodGroup.TypeName}(this)");
+            }
+        }
+
         public virtual string OptionalParameterTypeForClientConstructor
         {
             get
@@ -407,6 +528,22 @@ namespace AutoRest.TypeScript.Model
             set
             {
                 _optionalParameterTypeForClientConstructor = value;
+            }
+        }
+
+        public virtual IEnumerable<Property> RequiredParameters
+        {
+            get
+            {
+                return Properties.Where(p => p.IsRequired && !p.IsConstant && string.IsNullOrEmpty(p.DefaultValue));
+            }
+        }
+
+        public virtual IEnumerable<Property> OptionalParameters
+        {
+            get
+            {
+                return Properties.Where(p => (!p.IsRequired || p.IsRequired && !string.IsNullOrEmpty(p.DefaultValue)) && !p.IsConstant);
             }
         }
 
@@ -447,13 +584,13 @@ namespace AutoRest.TypeScript.Model
         {
             if (OptionalParameterTypeForClientConstructor != ServiceClientOptions)
             {
-                builder.Import(new string[] { ServiceClientOptions }, "@azure/ms-rest-js");
+                builder.Import(new string[] { ServiceClientOptions }, "@azure/core-http");
             }
         }
 
         public virtual void PackageDependencies(JSONObject dependencies)
         {
-            dependencies.StringProperty("@azure/ms-rest-js", "^1.2.6");
+            dependencies.StringProperty("@azure/core-http", "^1.0.0-preview.1");
             dependencies.StringProperty("tslib", "^1.9.3");
             if (Settings.MultiapiLatest)
             {
@@ -568,9 +705,9 @@ namespace AutoRest.TypeScript.Model
             foreach (ParameterTS parameter in parameters)
             {
                 string parameterInterfaceName =
-                    parameter.Location == ParameterLocation.Path ? "msRest.OperationURLParameter" :
-                    parameter.Location == ParameterLocation.Query ? "msRest.OperationQueryParameter" :
-                    "msRest.OperationParameter";
+                    parameter.Location == ParameterLocation.Path ? "coreHttp.OperationURLParameter" :
+                    parameter.Location == ParameterLocation.Query ? "coreHttp.OperationQueryParameter" :
+                    "coreHttp.OperationParameter";
 
                 builder.Text("export ");
                 builder.ConstObjectVariable(
@@ -587,9 +724,9 @@ namespace AutoRest.TypeScript.Model
         {
             TSBuilder builder = new TSBuilder();
 
-            if (MethodTemplateModels.Any() || OptionalParameterTypeForClientConstructor == ServiceClientOptions || RequiredConstructorParametersTS.Contains("msRest."))
+            if (MethodTemplateModels.Any() || OptionalParameterTypeForClientConstructor == ServiceClientOptions || RequiredConstructorParametersTS.Contains("coreHttp."))
             {
-                builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+                builder.ImportAllAs("coreHttp", "@azure/core-http");
             }
 
             if (CodeGeneratorTS.ShouldWriteModelsFiles(this))
@@ -807,7 +944,7 @@ namespace AutoRest.TypeScript.Model
         {
             if (orderedMapperModels.Any())
             {
-                builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+                builder.ImportAllAs("coreHttp", "@azure/core-http");
             }
         }
 
@@ -838,7 +975,7 @@ namespace AutoRest.TypeScript.Model
 
         protected void GenerateNodeSampleMsRestJsImport(TSBuilder builder)
         {
-            builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+            builder.ImportAllAs("coreHttp", "@azure/core-http");
         }
 
         protected void GenerateNodeSampleMsRestNodeAuthImport(TSBuilder builder)
@@ -979,6 +1116,8 @@ namespace AutoRest.TypeScript.Model
             });
             builder.Line();
             GenerateRelatedProjects(builder);
+            builder.Line();
+            GenerateImpressionPixel(builder);
 
             return builder.ToString();
         }
@@ -1074,10 +1213,10 @@ namespace AutoRest.TypeScript.Model
                             html.Head(head =>
                             {
                                 head.Title($"{PackageName} sample");
-                                head.Script("node_modules/@azure/ms-rest-js/dist/msRest.browser.js");
+                                head.Script("node_modules/@azure/core-http/dist/coreHttp.browser.js");
                                 if (IsAzure)
                                 {
-                                    head.Script("node_modules/@azure/ms-rest-azure-js/dist/msRestAzure.js");
+                                    head.Script("node_modules/@azure/core-arm/dist/coreArm.js");
                                 }
                                 head.Script("node_modules/@azure/ms-rest-browserauth/dist/msAuth.js");
                                 head.Script($"node_modules/{PackageName}/dist/{BundleFilename}.js");
@@ -1101,6 +1240,11 @@ namespace AutoRest.TypeScript.Model
             });
         }
 
+        private void GenerateImpressionPixel(MarkdownBuilder builder)
+        {
+            builder.Line($"![Impressions](https://azure-sdk-impressions.azurewebsites.net/api/impressions/azure-sdk-for-js/sdk{Settings.RelativeOutputPath}/README.png)");
+        }
+
         public string GenerateRollupConfig()
         {
             JSBuilder builder = new JSBuilder();
@@ -1117,7 +1261,7 @@ namespace AutoRest.TypeScript.Model
             {
                 string inputFilePath = $"./esm/{(Settings.MultiapiLatest ? "index" : Name.ToCamelCase())}.js";
                 config.QuotedStringProperty($"input", inputFilePath);
-                config.QuotedStringArrayProperty("external", new[] { "@azure/ms-rest-js", "@azure/ms-rest-azure-js" });
+                config.QuotedStringArrayProperty("external", new[] { "@azure/core-http", "@azure/core-arm" });
                 config.ObjectProperty("output", output =>
                 {
                     output.QuotedStringProperty("file", $"./dist/{BundleFilename}.js");
@@ -1126,8 +1270,8 @@ namespace AutoRest.TypeScript.Model
                     output.BooleanProperty("sourcemap", true);
                     output.ObjectProperty("globals", globals =>
                     {
-                        globals.QuotedStringProperty("@azure/ms-rest-js", "msRest");
-                        globals.QuotedStringProperty("@azure/ms-rest-azure-js", "msRestAzure");
+                        globals.QuotedStringProperty("@azure/core-http", "coreHttp");
+                        globals.QuotedStringProperty("@azure/core-arm", "coreArm");
                     });
 
                     JSBuilder banner = new JSBuilder();
@@ -1179,6 +1323,24 @@ namespace AutoRest.TypeScript.Model
                     devDependencies.StringProperty("rollup-plugin-node-resolve", "^3.4.0");
                     devDependencies.StringProperty("rollup-plugin-sourcemaps", "^0.4.2");
                     devDependencies.StringProperty("uglify-js", "^3.4.9");
+                    if (!String.IsNullOrEmpty(Settings.Test))
+                    {
+                        devDependencies.StringProperty("mocha", "^6.1.4");
+
+                        if (!String.IsNullOrEmpty(Settings.TestDependencies))
+                        {
+                            string[] testDependencies = Settings.TestDependencies.Split(',', ';').Select(dep => dep.Trim()).ToArray();
+                            foreach (string testDependency in testDependencies)
+                            {
+                                string[] dependencyInfo = testDependency.Split('@', StringSplitOptions.RemoveEmptyEntries);
+
+                                string testDependencyName = testDependency.StartsWith('@') ? $"@{dependencyInfo[0]}" : dependencyInfo[0];
+                                string testDependencyVersion = dependencyInfo[1];
+
+                                devDependencies.StringProperty(testDependencyName, $"^{testDependencyVersion}");
+                            }
+                        }
+                    }
                 });
                 packageJson.StringProperty("homepage", HomePageUrl);
                 packageJson.ObjectProperty("repository", repository =>
@@ -1200,7 +1362,7 @@ namespace AutoRest.TypeScript.Model
                     "esm/**/*.js.map",
                     "esm/**/*.d.ts",
                     "esm/**/*.d.ts.map",
-                    "lib/**/*.ts",
+                    "src/**/*.ts",
                     "README.md",
                     "rollup.config.js",
                     "tsconfig.json"
@@ -1209,9 +1371,26 @@ namespace AutoRest.TypeScript.Model
                 {
                     scripts.StringProperty("build", "tsc && rollup -c rollup.config.js && npm run minify");
                     scripts.StringProperty("minify", $"\"uglifyjs -c -m --comments --source-map \\\"content='./dist/{bundleFileName}.js.map'\\\" -o ./dist/{bundleFileName}.min.js ./dist/{bundleFileName}.js\"");
-                    scripts.StringProperty("prepack", "npm install && npm run build");
+
+                    string prepackCommand = "npm install && npm run build";
+                    if (HasTests)
+                    {
+                        prepackCommand += " && npm run test";
+                    }
+
+                    scripts.StringProperty("prepack", prepackCommand);
+
+                    if (HasTests)
+                    {
+                        scripts.StringProperty("test", TestCommand);
+                    }
                 });
                 packageJson.BooleanProperty("sideEffects", false);
+
+                if (AutoPublish)
+                {
+                    packageJson.BooleanProperty("autoPublish", true);
+                }
             });
 
             return builder.ToString();
@@ -1231,6 +1410,11 @@ namespace AutoRest.TypeScript.Model
             // {
             //     builder.ImportAllAs("msRest", "@azure/ms-rest-js");
             // }
+            // builder.Line(ConstructRuntimeImportForModelIndex());
+            // if (ContainsDurationPropertyInModels() || IsAnyModelInheritingFromRequestOptionsBase() || MethodsWithCustomResponseType.Any())
+            // {
+            //     builder.ImportAllAs("coreHttp", "@azure/core-http");
+            // }
             foreach (CompositeTypeTS model in OrderedModelTemplateModels)
             {
                 builder.Line();
@@ -1243,6 +1427,40 @@ namespace AutoRest.TypeScript.Model
             }
             builder.Line(GenerateResponseTypes());
 
+            return builder.ToString();
+        }
+
+        public virtual string GenerateCustomServiceClientOptions(string emptyLine)
+        {
+            if (Settings.CustomServiceClientOptions == null || !Settings.CustomServiceClientOptions.Any())
+            {
+                return String.Empty;
+            }
+
+            TSBuilder builder = new TSBuilder();
+            builder.Line(emptyLine);
+            builder.ObjectAssignment("options", options =>
+            {
+                options.Spread("options");
+                foreach (string optionSettings in Settings.CustomServiceClientOptions)
+                {
+                    string[] keyValueArray = optionSettings.Split('=');
+                    string propertyName = $"\"{keyValueArray[0]}\"";
+                    string propertyValue = keyValueArray[1].Replace("'", "\"");
+                    options.TextProperty(propertyName, propertyValue);
+                }
+            });
+            return builder.ToString();
+        }
+
+        public virtual string GenerateBaseUri()
+        {
+            TSBuilder builder = new TSBuilder();
+            string baseUrlValue = !this.IsCustomBaseUri
+                ? baseUrlValue = $"options.baseUri || this.baseUri || \"{BaseUrl}\""
+                : baseUrlValue = $"\"{BaseUrl}\"";
+
+            builder.ThisAssignment("baseUri", baseUrlValue);
             return builder.ToString();
         }
     }

@@ -6,7 +6,7 @@
 @Header(" * ")
  */
 @EmptyLine
-import * as msRest from "@@azure/ms-rest-js";
+import * as coreHttp from "@@azure/core-http";
 @{
 bool usesCustomOptionsType = Model.OptionalParameterTypeForClientConstructor != "ServiceClientOptions";
 if (usesCustomOptionsType)
@@ -18,76 +18,10 @@ if (usesCustomOptionsType)
 
 const packageName = "@Model.Settings.PackageName";
 const packageVersion = "@Model.Settings.PackageVersion";
-@{var requiredParameters = Model.Properties.Where(p => p.IsRequired && !p.IsConstant && string.IsNullOrEmpty(p.DefaultValue));}
-@{var optionalParameters = Model.Properties.Where(p => (!p.IsRequired || p.IsRequired && !string.IsNullOrEmpty(p.DefaultValue)) && !p.IsConstant);}
 @EmptyLine
-export class @(Model.ContextName) extends msRest.ServiceClient {
+export class @(Model.ContextName) extends coreHttp.ServiceClient {
   @(Model.GenerateClassProperties(EmptyLine))
 @EmptyLine
   @(Model.GenerateConstructorComment(Model.ContextName))
-@{ var clientOptionType = Model.OptionalParameterTypeForClientConstructor == "ServiceClientOptions" ? "msRest.ServiceClientOptions" : Model.OptionalParameterTypeForClientConstructor;}
-  constructor(@(!string.IsNullOrEmpty(Model.RequiredConstructorParametersTS) ? Model.RequiredConstructorParametersTS + ", " : "")options?: @clientOptionType) {
-@foreach (var param in requiredParameters)
-{
-<text>
-    if (@(param.Name) === null || @(param.Name) === undefined) {
-      throw new Error('\'@(param.Name)\' cannot be null.');
-    }
-</text>
-}
-@EmptyLine
-    if (!options) {
-      options = {};
-    }
-
-    if(!options.userAgent) {
-      const defaultUserAgent = msRest.getDefaultUserAgentValue();
-      options.userAgent = `${packageName}/${packageVersion} ${defaultUserAgent}`;
-    }
-@EmptyLine
-    super(@(requiredParameters.Any(p => p.ModelType.IsPrimaryType(KnownPrimaryType.Credentials)) ? "credentials" : "undefined"), options);
-    @EmptyLine
-@foreach (var property in Model.Properties.Where(p => p.DefaultValue != null))
-{
-<text>
-    this.@(property.Name) = @(property.DefaultValue);
-</text>
-}
-
-@if (!Model.IsCustomBaseUri)
-{
-<text>
-    this.baseUri = options.baseUri || this.baseUri || "@Model.SchemeHostAndPort";
-</text>
-}
-else
-{
-<text>
-    this.baseUri = "@Model.SchemeHostAndPort";
-</text>
-}
-
-@if (!string.IsNullOrEmpty(Model.RequestContentType))
-{
-<text>
-    this.requestContentType = "@(Model.RequestContentType)";
-</text>
-}
-
-@foreach (var param in requiredParameters)
-{
-<text>
-    this.@(param.Name) = @(param.Name);
-</text>
-}
-@EmptyLine
-@foreach (var property in optionalParameters.Where(p => p.Name != "generatedClientRequestId"))
-{
-<text>
-    if(options.@(property.Name) !== null && options.@(property.Name) !== undefined) {
-      this.@(property.Name) = options.@(property.Name);
-    }
-</text>
-}
-  }
+  @(Model.GenerateContextConstructor(@EmptyLine))
 }

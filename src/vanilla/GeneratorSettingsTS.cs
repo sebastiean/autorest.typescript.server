@@ -42,10 +42,25 @@ namespace AutoRest.TypeScript
         /// </summary>
         public bool? GenerateLicenseTxt { get; set; }
 
+        /// <summery>
+        /// Whether to add "test" NPM script.
+        /// This enables "npm run test" command to be run in CI.
+        /// If "true" passed, default command will be added i.e. "mocha".
+        /// Otherwise, the content of the variable will be added to the script.
+        /// </summary>
+        public string Test { get; set; }
+
+        /// <summery>
+        /// List of comma or semicolon separated dependencies used in packages test.
+        /// Dependencies will be added to devDependencies section of package.json.
+        /// E.g. "nock@1.0.0, jest@2.0.0; @azure/ms-rest-js@3.0.0".
+        /// </summary>
+        public string TestDependencies { get; set; }
+
         /// <summary>
         /// The sub-folder path where source code will be generated.
         /// </summary>
-        public string SourceCodeFolderPath { get; set; } = "";
+        public string SourceCodeFolderPath { get; set; } = "src";
 
         /// <summary>
         /// The name of the npm package, e.g. "@azure/arm-storage".
@@ -127,6 +142,14 @@ namespace AutoRest.TypeScript
         public string[] SkipSubtypes { get; set; }
 
         /// <summary>
+        /// A list of ServiceClientOptions settings to override in the generated client.
+        /// By default keys are wrapped in quotes but values are not.
+        /// Use single quotation marks ("'") if you want your values to be injected as a string.
+        /// See ServiceClientOptions in @azure/ms-rest-js package for available options.
+        /// </summary>
+        public string[] CustomServiceClientOptions { get; set; }
+
+        /// <summary>
         /// Computes the NPM package referenced by an alias package.
         /// </summary>
         public string AliasedNpmPackageName
@@ -140,6 +163,12 @@ namespace AutoRest.TypeScript
                 return null;
             }
         }
+
+        /// <summary>
+        /// If true, adds "autoPublish" property to package's package.json.
+        /// The property is used to determine if package can be publish automatically.
+        /// </summary>
+        public bool? AutoPublish { get; set; }
 
         /// <summary>
         /// If the PackageVersion property is null or empty, then first try to update it from an
@@ -340,6 +369,22 @@ namespace AutoRest.TypeScript
             else
             {
                 Console.WriteLine($"{category}: {logMessage}");
+            }
+        }
+
+        public string RelativeOutputPath
+        {
+            get
+            {
+                    string outputFolder = OutputFolder.Replace('\\', '/');
+                    string outputFolderSearchString = "/azure-sdk-for-js/sdk";
+                    int searchStringIndex = outputFolder.IndexOf(outputFolderSearchString, StringComparison.OrdinalIgnoreCase);
+
+                    if (searchStringIndex == -1) {
+                        return null;
+                    }
+
+                    return outputFolder.Substring(searchStringIndex + outputFolderSearchString.Length);
             }
         }
     }

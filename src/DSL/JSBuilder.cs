@@ -469,19 +469,32 @@ namespace AutoRest.TypeScript.DSL
 
         public void ConstVariable(string variableName, string variableValue)
         {
-            Line($"const {variableName} = {variableValue};");
+            Assignment($"const {variableName}", variableValue);
         }
 
-        public void ConstObjectVariable(string variableName, Action<JSObject> valueAction)
-        {
-            Text($"const {variableName} = ");
-            Object(valueAction);
-            Line($";");
+        public void ThisAssignment(string memberVariableName, string variableValue) {
+            Assignment($"this.{memberVariableName}", variableValue);
         }
 
         public void ConstObjectVariable(string variableName, string value)
         {
-            Line($"const {variableName} = {value};");
+            Assignment($"const {variableName}", value);
+        }
+
+        public void Assignment(string variableName, string variableValue) {
+            Line($"{variableName} = {variableValue};");
+        }
+
+        public void ConstObjectVariable(string variableName, Action<JSObject> valueAction)
+        {
+            ObjectAssignment($"const {variableName}", valueAction);
+        }
+
+        public void ObjectAssignment(string variableName, Action<JSObject> valueAction)
+        {
+            Text($"{variableName} = ");
+            Object(valueAction);
+            Line(";");
         }
 
         public void ImportAllAs(string importAs, string importSource)
