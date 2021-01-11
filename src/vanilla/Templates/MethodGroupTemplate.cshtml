@@ -6,8 +6,7 @@
 // tslint:disable:max-line-length
 
 @EmptyLine
-import * as Models from "../artifacts/models";
-import Context from "../Context";
+@(Model.CodeModelTS.GenerateMethodGroupTemplateImports())
 @EmptyLine
 export default interface @(Model.HandlerInterfaceName) {
   @(CodeGeneratorTS.GenerateMethods(Model.MethodTemplateModels, EmptyLine))

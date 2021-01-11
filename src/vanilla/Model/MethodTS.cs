@@ -738,17 +738,19 @@ namespace AutoRest.TypeScript.Model
             return LocalParameters.Where(parameter => parameter.IsRequired).Select(AutoRestParameterToTSParameter).ToArray();
         }
 
-        protected TSParameter GetOptionsParameter(bool required)
+        public string GetOptionsParameterType()
         {
-            string optionsParameterType;
             if (OptionsParameterModelType.Name.EqualsIgnoreCase("RequestOptionsBase"))
             {
-                optionsParameterType = "coreHttp.RequestOptionsBase";
+                return "coreHttp.RequestOptionsBase";
             }
-            else
-            {
-                optionsParameterType = $"Models.{OptionsParameterModelType.Name}";
-            }
+
+            return $"Models.{OptionsParameterModelType.Name}";
+        }
+
+        protected TSParameter GetOptionsParameter(bool required)
+        {
+            string optionsParameterType = GetOptionsParameterType();
             return new TSParameter("options", optionsParameterType, "The optional parameters", required);
         }
 

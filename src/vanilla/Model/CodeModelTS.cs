@@ -152,7 +152,7 @@ namespace AutoRest.TypeScript.Model
         public virtual IEnumerable<EnumTypeTS> EnumTemplateModels => EnumTypes.Cast<EnumTypeTS>();
 
         [JsonIgnore]
-        public virtual IEnumerable<MethodGroupTS> MethodGroupModels => Operations.Cast<MethodGroupTS>().Where(each => !each.IsCodeModelMethodGroup);
+        public virtual IEnumerable<MethodGroupTS> MethodGroupModels => Operations.Cast<MethodGroupTS>();//.Where(each => !each.IsCodeModelMethodGroup);
 
         [JsonIgnore]
         public virtual IEnumerable<MethodTS> MethodWrappableTemplateModels =>
@@ -720,6 +720,24 @@ namespace AutoRest.TypeScript.Model
             return builder.ToString();
         }
 
+        public string GenerateMethodGroupTemplateImports()
+        {
+            TSBuilder builder = new TSBuilder();
+
+            foreach (MethodTS method in MethodTemplateModels)
+            {
+                if (method.GetOptionsParameterType().Contains("coreHttp.")) {
+                    builder.ImportAllAs("coreHttp", "@azure/core-http");
+                    break;
+                }
+            }
+
+            builder.ImportAllAs("Models", "../artifacts/models");
+            builder.ImportFrom("Context", "../Context");
+
+            return builder.ToString();
+        }
+
         public string GenerateServiceClientImports()
         {
             TSBuilder builder = new TSBuilder();
@@ -757,7 +775,7 @@ namespace AutoRest.TypeScript.Model
         {
             TSBuilder builder = new TSBuilder();
 
-            builder.ImportAllAs("msRest", "@azure/ms-rest-js");
+            builder.ImportAllAs("coreHttp", "@azure/core-http");
             builder.Line(emptyLine);
             builder.ImportAllAs("Mappers", "./mappers");
             builder.Import(new string[] { "Operation" }, "./operation");
@@ -841,7 +859,7 @@ namespace AutoRest.TypeScript.Model
         {
             TSBuilder builder = new TSBuilder();
             builder.Line();
-            builder.Line("const Specifications: { [key: number]: msRest.OperationSpec } = {};");
+            builder.Line("const Specifications: { [key: number]: coreHttp.OperationSpec } = {};");
 
             foreach (MethodTS method in MethodsWithCustomResponseType)
             {

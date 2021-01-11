@@ -18,9 +18,9 @@ namespace AutoRest.TypeScript.DSL
             builder.DocumentationComment(comment);
         }
 
-        public void Property(string propertyName, string propertyType, bool optional = false, bool isReadonly = false)
+        public void Property(string propertyName, string propertyType, bool optional = false, bool isReadonly = false, bool isNullable = false)
         {
-            builder.Line($"{(isReadonly ? "readonly " : "")}{propertyName}{(optional ? "?" : "")}: {propertyType};");
+            builder.Line($"{(isReadonly ? "readonly " : "")}{propertyName}{(optional ? "?" : "")}: {propertyType}{(isNullable ? " | null" : "")};");
         }
     }
 }

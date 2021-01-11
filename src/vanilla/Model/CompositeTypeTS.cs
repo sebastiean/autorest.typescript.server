@@ -419,10 +419,11 @@ namespace AutoRest.TypeScript.Model
                 baseTypeName = BaseModelType.Name;
                 if (baseTypeName == "RequestOptionsBase")
                 {
-                    baseTypeName = $"coreHttp.{baseTypeName}";
+                    // baseTypeName = $"coreHttp.{baseTypeName}";
+                    baseTypeName = null;
                 }
             }
-            builder.ExportInterface(Name, null, tsInterface =>
+            builder.ExportInterface(Name, baseTypeName, tsInterface =>
             {
                 ISet<string> addedPropertyNames = new HashSet<string>();
                 
@@ -443,7 +444,8 @@ namespace AutoRest.TypeScript.Model
                         string propertyType = property.IsPolymorphicDiscriminator ? $"\"{SerializedName}\"" : property.ModelType.TSType(true);
                         bool isReadonly = property.IsReadOnly;
                         bool isOptional = !property.IsRequired && (!(CodeModel?.HeaderTypes.Contains(this) == true) || CodeModelTS.Settings.OptionalResponseHeaders);
-                        tsInterface.Property(property.Name, propertyType, optional: isOptional, isReadonly: isReadonly);
+                        bool isNullable = property.IsXNullable ?? false;
+                        tsInterface.Property(property.Name, propertyType, optional: isOptional, isReadonly: isReadonly, isNullable: isNullable);
                     }
                 }
 
